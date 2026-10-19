@@ -1,0 +1,12 @@
+**/node_modules/
+node_modules/
+
+**/.env
+.env
+.env.*
+
+# Build and Expo files
+**/.expo/
+**/dist/
+**/build/
+.DS_Store

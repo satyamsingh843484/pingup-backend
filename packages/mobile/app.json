@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "PingUp",
+    "slug": "pingup-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.satyam.pingup" 
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Allow PingUp to access your camera for video calls.",
+          "microphonePermission": "Allow PingUp to access your microphone for audio calls."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow PingUp to access your photos to send in chat.",
+          "cameraPermission": "Allow PingUp to access your camera to click and send photos."
+        }
+      ]
+    ]
+  }
+}

@@ -9,4 +9,8 @@ node_modules/
 **/.expo/
 **/dist/
 **/build/
+.DS_Storepackages/server/firebaseServiceAccount.json
+packages/server/firebaseServiceAccount.json
+.DS_Store
+packages/server/firebaseServiceAccount.json
 .DS_Store

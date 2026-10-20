@@ -44,7 +44,7 @@ app.use('/api/chats', chatsRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/calls', callsRouter);
 
-// ✨ NAYA: Online users track karne ke liye Map
+// ✨ FIX: Map me ab safely String keys use hongi
 const onlineUsers = new Map();
 
 // 📞 Real-Time Socket.IO Logic
@@ -53,12 +53,16 @@ io.on('connection', (socket) => {
 
   // 1. User app kholte hi apna private room join karega
   socket.on('register', (userId) => {
-    socket.join(`user_${userId}`);
+    // ✨ FIX: Map ke liye String, Emit ke liye Number
+    const strUserId = String(userId);
+    const numUserId = Number(userId);
+
+    socket.join(`user_${numUserId}`);
     
     // ✨ NAYA: User ko map me daalo aur sabko batao ki wo Online aa gaya hai
-    onlineUsers.set(userId, socket.id);
-    console.log(`📱 User ${userId} registered for calls & is now ONLINE`);
-    io.emit('userStatus', { userId, status: 'online' });
+    onlineUsers.set(strUserId, socket.id);
+    console.log(`📱 User ${numUserId} registered for calls & is now ONLINE`);
+    io.emit('userStatus', { userId: numUserId, status: 'online' });
   });
 
   // 2. Koi call lagayega toh ye fire hoga
@@ -92,26 +96,30 @@ io.on('connection', (socket) => {
   // ✨ NAYA: Typing Indicator Events ✨
   socket.on('typing', (data) => {
     const { senderId, receiverId } = data;
-    socket.to(`user_${receiverId}`).emit('typing', { senderId });
+    socket.to(`user_${receiverId}`).emit('typing', { senderId: Number(senderId) });
   });
 
   socket.on('stopTyping', (data) => {
     const { senderId, receiverId } = data;
-    socket.to(`user_${receiverId}`).emit('stopTyping', { senderId });
+    socket.to(`user_${receiverId}`).emit('stopTyping', { senderId: Number(senderId) });
   });
 
   // ✨ UPDATED: Online Status Check (with Last Seen from DB) ✨
   socket.on('checkStatus', async (userId) => {
-    const isOnline = onlineUsers.has(userId);
+    // ✨ FIX: String checking ke sath Number response
+    const strUserId = String(userId);
+    const numUserId = Number(userId);
+    
+    const isOnline = onlineUsers.has(strUserId);
     if (isOnline) {
-      socket.emit('userStatus', { userId, status: 'online' });
+      socket.emit('userStatus', { userId: numUserId, status: 'online' });
     } else {
       try {
         const user = await prisma.user.findUnique({ 
-          where: { id: parseInt(userId) }, 
+          where: { id: numUserId }, 
           select: { lastSeen: true } 
         });
-        socket.emit('userStatus', { userId, status: 'offline', lastSeen: user?.lastSeen });
+        socket.emit('userStatus', { userId: numUserId, status: 'offline', lastSeen: user?.lastSeen });
       } catch (error) {
         console.error('Error fetching lastSeen:', error);
       }
@@ -176,16 +184,17 @@ io.on('connection', (socket) => {
     }
 
     if (disconnectedUserId) {
-      console.log(`❌ User ${disconnectedUserId} went OFFLINE`);
+      const numUserId = Number(disconnectedUserId); // ✨ FIX: Number format me bhejna hai
+      console.log(`❌ User ${numUserId} went OFFLINE`);
       const now = new Date();
       try {
         // DB me time update karo
         await prisma.user.update({
-          where: { id: parseInt(disconnectedUserId) },
+          where: { id: numUserId },
           data: { lastSeen: now }
         });
         // Sabko batao ki offline ho gaya aur time kya hai
-        io.emit('userStatus', { userId: disconnectedUserId, status: 'offline', lastSeen: now });
+        io.emit('userStatus', { userId: numUserId, status: 'offline', lastSeen: now });
       } catch (error) {
         console.error('Error updating lastSeen on disconnect:', error);
       }

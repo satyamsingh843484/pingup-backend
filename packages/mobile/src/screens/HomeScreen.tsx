@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  SafeAreaView, ActivityIndicator, RefreshControl, TextInput, Platform 
+  SafeAreaView, ActivityIndicator, RefreshControl, TextInput, Platform,
+  AppState // ✨ NAYA: App background me jaane ko detect karne ke liye
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import socket from '../socket'; // ✨ Global socket file yahan import ho gayi
+import socket from '../socket'; // ✨ Global socket
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 
@@ -18,17 +19,40 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchChatsData();
+
+    // ✨ NAYA MASTER FIX: AppState Listener (Instant Offline/Online ke liye)
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active') {
+        socket.connect();
+        const storedUserId = await AsyncStorage.getItem('userId');
+        if (storedUserId) {
+          socket.emit('register', Number(storedUserId)); // Hamesha Number bhejo
+        }
+      } else if (nextAppState === 'background') { // 'inactive' hata diya yahan se
+        socket.disconnect();
+      }
+    });
+
+    // Dusre users ka status update sunne ke liye
+    socket.on('userStatus', (statusData) => {
+      console.log('Real-time Status Update:', statusData);
+      // Future me yahan tum recentChats me green dot update karne ka logic laga sakte ho
+    });
+
+    return () => {
+      subscription.remove();
+      socket.off('userStatus');
+    };
   }, []);
 
   const fetchChatsData = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      // Agar AuthScreen me tumne userId save karwaya tha, toh usko bhi nikal sakte ho
       const storedUserId = await AsyncStorage.getItem('userId'); 
 
       if (!token) { navigation.replace('Auth'); return; }
       
-      const response = await fetch('http://10.190.47.168:3000/api/chats/recent', {
+      const response = await fetch('http://10.190.47.168:3000/api/chats/recent', { // Apna sahi IP yahan check kar lena
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await response.json();
@@ -36,13 +60,11 @@ export default function HomeScreen() {
       if (json.success) {
         setData(json);
 
-        // ✨ NAYA: GLOBAL SOCKET CONNECTION LOGIC YAHAN AAYEGA ✨
-        // Hum try karenge json se ID nikalne ki, nahi toh storedUserId use karenge
         const myUserId = json.currentUserId || storedUserId; 
 
         if (myUserId) {
-          socket.connect(); // 1. Socket background me chalu karo
-          socket.emit('register', myUserId); // 2. Sabko batao ki ye user online aa gaya hai
+          socket.connect(); 
+          socket.emit('register', Number(myUserId)); // ✨ FIX: Hamesha Number bhejo
           console.log('Global Socket Connected for user:', myUserId);
         }
       }
@@ -71,7 +93,6 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>PingUp</Text>
-          {/* Ab ye API se aane wala asli naam dikhayega */}
           <Text style={styles.subTitle}>Hey, {data?.currentUser || 'User'}</Text>
         </View>
         <View style={styles.headerIcons}>
@@ -111,7 +132,7 @@ export default function HomeScreen() {
             <Text style={styles.storyName}>My Status</Text>
           </TouchableOpacity>
           
-          {data.stories.map((story: any, index: number) => (
+          {data.stories?.map((story: any, index: number) => (
             <TouchableOpacity key={index} style={styles.storyItem}>
               <View style={styles.storyRing}>
                 <View style={[styles.storyAvatar, { backgroundColor: '#9B59B6' }]}>
@@ -126,11 +147,10 @@ export default function HomeScreen() {
         {/* 4. Recent Chats List */}
         <Text style={styles.sectionTitle}>Recent Chats</Text>
         <View style={styles.chatList}>
-          {data.recentChats.map((chat: any, index: number) => (
+          {data.recentChats?.map((chat: any, index: number) => (
             <TouchableOpacity 
               key={index} 
               style={styles.chatItem}
-              // Ye sabse important line hai: Chat click karne par ChatDetailScreen open hoga
               onPress={() => navigation.navigate('ChatDetail', { userId: chat.id, username: chat.username })}
             >
               <View style={[styles.chatAvatar, { backgroundColor: '#4DACFF' }]}>
@@ -171,7 +191,7 @@ const styles = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A183A', borderRadius: 16, paddingHorizontal: 15, height: 45, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   searchInput: { flex: 1, color: '#fff', marginLeft: 10, fontSize: 15 },
 
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 100 }, // Bottom padding for Tab Bar
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 100 }, 
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#FFFFFF', marginBottom: 15, marginTop: 10 },
   
   storiesRow: { flexDirection: 'row', marginBottom: 25, marginLeft: -5 },

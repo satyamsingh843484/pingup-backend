@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator,
-  Modal, TextInput, Alert, Linking // ✨ NAYE IMPORTS
+  Modal, TextInput, Alert, Linking 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
+
+// ✨ NAYE IMPORTS: Logout fix ke liye
+import socket from '../socket'; 
+import { getAuth, signOut } from 'firebase/auth';
 
 const HeartIcon = () => (
   <Svg width={14} height={14} viewBox="0 0 24 24" fill="#FF3B30">
@@ -106,23 +110,49 @@ export default function ProfileScreen() {
     );
   };
 
+  // ✨ UPDATED: PERFECT LOGOUT FUNCTION
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('userToken');
-    navigation.replace('Auth');
+    try {
+      console.log("Logging out...");
+
+      // 1. Socket ko forcefully disconnect karo (Taaki server par user offline dikhe)
+      if (socket && socket.connected) {
+        socket.disconnect();
+      }
+
+      // 2. Firebase ko sign out karo
+      try {
+        const auth = getAuth();
+        await signOut(auth);
+      } catch (fbError) {
+        console.log("Firebase signout error (ignoring):", fbError);
+      }
+
+      // 3. Local storage se tokens aur data hatao
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userInfo');
+      await AsyncStorage.removeItem('userId');
+      // await AsyncStorage.clear(); // (Agar baaki sab bhi delete karna ho toh ye use kar sakte ho)
+
+      // 4. Wapas login page par bhej do
+      navigation.replace('Auth');
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
   };
 
   // ✨ MENU CLICK HANDLER
   const handleMenuPress = (m: any) => {
-  if (m.label === 'Edit Profile') {
-    setEditModalVisible(true);
-  } else if (m.label === 'Help & Support') {
-    navigation.navigate('HelpSupportScreen');
-  } else if (m.label === 'About PingUp') {
-    navigation.navigate('AboutScreen');
-  } else if (m.route) {
-    navigation.navigate(m.route);
-  }
-};
+    if (m.label === 'Edit Profile') {
+      setEditModalVisible(true);
+    } else if (m.label === 'Help & Support') {
+      handleSupport(); // Modal wala support khulega
+    } else if (m.label === 'About PingUp') {
+      handleAbout(); // Modal wala about khulega
+    } else if (m.route) {
+      navigation.navigate(m.route);
+    }
+  };
 
   if (loading) {
     return (
@@ -214,10 +244,10 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <View style={[styles.footerContainer, { marginBottom: 100 }]}>
-  <Text style={styles.footerText}>PingUp v2.4.0 • Made with </Text>
-  <HeartIcon />
-  <Text style={styles.footerText}> by Satyam</Text>
-</View>
+          <Text style={styles.footerText}>PingUp v2.4.0 • Made with </Text>
+          <HeartIcon />
+          <Text style={styles.footerText}> by Satyam</Text>
+        </View>
         
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -298,7 +328,7 @@ const styles = StyleSheet.create({
   footerContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 30, gap: 4 },
   footerText: { color: '#3A3860', fontSize: 12, fontWeight: '700' },
 
-  // ✨ MODAL CSS (Dark theme ke hisaab se)
+  // ✨ MODAL CSS
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { width: '100%', backgroundColor: '#1A183A', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   modalTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', marginBottom: 15 },

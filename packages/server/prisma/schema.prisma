@@ -10,18 +10,23 @@ datasource db {
 }
 
 model User {
-  id          Int       @id @default(autoincrement())
-  username    String    @unique
-  email       String?   @unique
-  phoneNumber String?   @unique
-  password    String
+  id            Int       @id @default(autoincrement())
+  username      String    @unique
+  email         String?   @unique
+  phoneNumber   String?   @unique
+  
+  // ✨ FIX: Password ko optional (?) banaya taaki Google/Phone users aaram se save ho sakein
+  password      String?   
+  
+  // ✨ NAYA: Ye batayega ki user kahan se aaya ("local", "google", ya "phone")
+  authProvider  String    @default("local") 
   
   // Naye Profile Features
-  isPro       Boolean   @default(false)
-  streakCount Int       @default(0)
-  lastLogin   DateTime?
+  isPro         Boolean   @default(false)
+  streakCount   Int       @default(0)
+  lastLogin     DateTime?
   
-  createdAt   DateTime  @default(now())
+  createdAt     DateTime  @default(now())
 
   // Relations
   sentMessages     Message[] @relation("SentMessages")

@@ -172,6 +172,26 @@ router.post('/unified-login', async (req: any, res: any) => {
     res.status(500).json({ success: false, message: "Server me kuch gadbad ho gayi." });
   }
 });
+// ✨ 4.5 NAYA ROUTE: App se Push Token receive karke DB me save karna
+router.post('/save-push-token', async (req: any, res: any) => {
+  try {
+    const { userId, pushToken } = req.body;
+    
+    if (!userId || !pushToken) {
+      return res.status(400).json({ success: false, message: 'Missing data' });
+    }
+
+    await prisma.user.update({
+      where: { id: Number(userId) },
+      data: { pushToken: pushToken }
+    });
+
+    res.json({ success: true, message: 'Push token successfully saved!' });
+  } catch (error) {
+    console.error('Error saving push token:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // 5. GET USERS ROUTE
 router.get('/users', authenticateToken, async (req: any, res: Response) => {

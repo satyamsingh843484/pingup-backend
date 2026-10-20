@@ -8,6 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import socket from '../socket'; // ✨ Global socket
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 
 export default function HomeScreen() {
   const [data, setData] = useState<any>({ stories: [], recentChats: [] });
@@ -16,6 +18,31 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState('');
   
   const navigation = useNavigation<any>();
+
+  const registerForPushNotificationsAsync = async (userId: any) => {
+    let token;
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.log('Failed to get push token for push notification!');
+        return;
+      }
+      token = (await Notifications.getExpoPushTokenAsync()).data;
+      console.log("🔥 Mera Push Token:", token);
+      await fetch('http://10.190.47.168:3000/api/auth/save-push-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userId, pushToken: token }),
+      });
+    } else {
+      console.log('Must use physical device for Push Notifications');
+    }
+  };
 
   useEffect(() => {
     fetchChatsData();
@@ -66,6 +93,7 @@ export default function HomeScreen() {
           socket.connect(); 
           socket.emit('register', Number(myUserId)); // ✨ FIX: Hamesha Number bhejo
           console.log('Global Socket Connected for user:', myUserId);
+          registerForPushNotificationsAsync(myUserId);
         }
       }
     } catch (error) {

@@ -37,6 +37,8 @@ model User {
   callsMade        CallHistory[] @relation("Caller")
   callsReceived    CallHistory[] @relation("Receiver")
   lastSeen  DateTime @default(now())
+
+  pushToken    String?
 }
 
 model Message {

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import { AuthContext } from '../context/AuthContext';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator,
-  Modal, TextInput, Alert, Linking 
+  Modal, TextInput,  Alert, Linking, Animated 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -11,6 +12,7 @@ import Svg, { Path } from 'react-native-svg';
 // ✨ NAYE IMPORTS: Logout fix ke liye
 import socket from '../socket'; 
 import { getAuth, signOut } from 'firebase/auth';
+import { getAvatarColor } from '../utils/avatarUtils';
 
 const HeartIcon = () => (
   <Svg width={14} height={14} viewBox="0 0 24 24" fill="#FF3B30">
@@ -19,6 +21,7 @@ const HeartIcon = () => (
 );
 
 export default function ProfileScreen() {
+  const { signOut } = useContext(AuthContext);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
@@ -29,7 +32,16 @@ export default function ProfileScreen() {
 
   const navigation = useNavigation<any>();
 
+  // Entrance Animation for Premium Feel
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
   useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
+    ]).start();
+
     fetchProfile();
   }, []);
 
@@ -95,7 +107,6 @@ export default function ProfileScreen() {
       "Help & Support",
       "Where you want to Contact?",
       [
-        // Apna asli email/phone yahan replace kar lena
         { text: "Email Me", onPress: () => Linking.openURL('mailto:satyam@example.com?subject=PingUp Support Request') },
         { text: "Call Me", onPress: () => Linking.openURL('tel:+919999999999') },
         { text: "Cancel", style: "cancel" }
@@ -115,12 +126,10 @@ export default function ProfileScreen() {
     try {
       console.log("Logging out...");
 
-      // 1. Socket ko forcefully disconnect karo (Taaki server par user offline dikhe)
       if (socket && socket.connected) {
         socket.disconnect();
       }
 
-      // 2. Firebase ko sign out karo
       try {
         const auth = getAuth();
         await signOut(auth);
@@ -128,27 +137,23 @@ export default function ProfileScreen() {
         console.log("Firebase signout error (ignoring):", fbError);
       }
 
-      // 3. Local storage se tokens aur data hatao
       await AsyncStorage.removeItem('userToken');
       await AsyncStorage.removeItem('userInfo');
       await AsyncStorage.removeItem('userId');
-      // await AsyncStorage.clear(); // (Agar baaki sab bhi delete karna ho toh ye use kar sakte ho)
 
-      // 4. Wapas login page par bhej do
-      navigation.replace('Auth');
+      signOut();
     } catch (error) {
       console.error("Logout Error:", error);
     }
   };
 
-  // ✨ MENU CLICK HANDLER
   const handleMenuPress = (m: any) => {
     if (m.label === 'Edit Profile') {
       setEditModalVisible(true);
     } else if (m.label === 'Help & Support') {
-      handleSupport(); // Modal wala support khulega
+      navigation.navigate('HelpSupportScreen');
     } else if (m.label === 'About PingUp') {
-      handleAbout(); // Modal wala about khulega
+      navigation.navigate('AboutScreen');
     } else if (m.route) {
       navigation.navigate(m.route);
     }
@@ -168,100 +173,162 @@ export default function ProfileScreen() {
   const menu = [
     { icon: 'person-outline', label: 'Edit Profile', color: '#4DACFF' },
     { icon: 'notifications-outline', label: 'Notifications', color: '#FFB800', route: 'NotificationsScreen' },
-    { icon: 'lock-closed-outline', label: 'Privacy & Security', color: '#4DFFB8' },
+    { icon: 'lock-closed-outline', label: 'Privacy & Security', color: '#4DFFB8', route: 'PrivacySecurityScreen' },
     { icon: 'color-palette-outline', label: 'Appearance', color: '#9B59B6' },
     { icon: 'cloud-upload-outline', label: 'Backup & Restore', color: '#4DACFF' },
     { icon: 'help-circle-outline', label: 'Help & Support', color: '#FFB800' },
     { icon: 'information-circle-outline', label: 'About PingUp', color: '#A0A0C0' },
   ];
 
+  const accountMenu = menu.slice(0, 5);
+  const supportMenu = menu.slice(5);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Profile</Text>
-
-        <View style={styles.profileCard}>
-          <View style={styles.profileAvatar}>
-            <Text style={styles.profileInitial}>{displayInitial}</Text>
-            <View style={styles.onlineDot} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.profileName}>{username}</Text>
-            <Text style={styles.profileHandle}>@{username.toLowerCase().replace(/\s/g, '')}_99 • Level {profile?.streakCount ? profile.streakCount + 4 : 12} 🔥</Text>
-          </View>
-          {profile?.isPro && (
-            <View style={styles.proChip}>
-              <Ionicons name="star" size={11} color="#12102A" />
-              <Text style={styles.proText}>PRO</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.statRow}>
-          {[{ n: '128', l: 'Chats' }, { n: '4', l: 'Groups' }, { n: profile?.streakCount || '7', l: 'Streak' }, { n: '12', l: 'Level' }].map((s, i) => (
-            <View key={i} style={styles.statBox}>
-              <Text style={styles.statNum}>{s.n}</Text>
-              <Text style={styles.statLbl}>{s.l}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.storageCard}>
-          <View style={styles.rowBetween}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="cloud" size={18} color="#4DACFF" />
-              <Text style={styles.cardTitle}>Storage</Text>
-            </View>
-            <Text style={styles.percent}>68% used</Text>
-          </View>
-          <View style={styles.bar}><View style={[styles.barFill, { width: '68%' }]} /></View>
-          <View style={styles.legendRow}>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#4DACFF' }]} /><Text style={styles.legendText}>Media 34%</Text></View>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#4DFFB8' }]} /><Text style={styles.legendText}>Docs 20%</Text></View>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#FFB800' }]} /><Text style={styles.legendText}>Other 14%</Text></View>
-          </View>
-        </View>
-
-        {/* Naya Menu map function jo handleMenuPress call karega */}
-        {menu.map((m, i) => (
-          <TouchableOpacity key={i} style={styles.menuItem} onPress={() => handleMenuPress(m)}>
-            <View style={[styles.menuIcon, { backgroundColor: `${m.color}20` }]}>
-              <Ionicons name={m.icon as any} size={18} color={m.color} />
-            </View>
-            <Text style={styles.menuLabel}>{m.label}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#3A3860" />
-          </TouchableOpacity>
-        ))}
-
-        <View style={styles.privacyRow}>
-          <Ionicons name="lock-closed" size={14} color="#4DFFB8" />
-          <Text style={styles.privacyText}>End-to-end encrypted • Face ID active</Text>
-        </View>
-
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={18} color="#FF6B6B" />
-          <Text style={styles.logoutText}>Log Out</Text>
-        </TouchableOpacity>
-
-        <View style={[styles.footerContainer, { marginBottom: 100 }]}>
-          <Text style={styles.footerText}>PingUp v2.4.0 • Made with </Text>
-          <HeartIcon />
-          <Text style={styles.footerText}> by Satyam</Text>
-        </View>
         
-        <View style={{ height: 100 }} />
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+          
+          {/* ===== HEADER ===== */}
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.title}>Profile</Text>
+              <Text style={styles.subtitle}>Manage your account & preferences</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.headerIconBtn}
+              onPress={() => setEditModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="create-outline" size={18} color="#4DACFF" />
+            </TouchableOpacity>
+          </View>
+
+          {/* ===== HERO PROFILE CARD ===== */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroGlow} />
+            
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatarGlowRing} />
+              <View style={[styles.profileAvatar, { backgroundColor: getAvatarColor(username) }]}>
+                <Text style={styles.profileInitial}>{displayInitial}</Text>
+              </View>
+              <View style={styles.onlineDot} />
+            </View>
+
+            {profile?.isPro && (
+              <View style={styles.proChip}>
+                <Ionicons name="star" size={11} color="#12102A" />
+                <Text style={styles.proText}>PRO</Text>
+              </View>
+            )}
+
+            <Text style={styles.profileName}>{username}</Text>
+            <Text style={styles.profileHandle}>
+              @{username.toLowerCase().replace(/\s/g, '')}_99
+            </Text>
+
+            {/* ✅ Verified Badge */}
+            <View style={styles.verifiedContainer}>
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="shield-checkmark" size={14} color="#12102A" />
+                <Text style={styles.verifiedText}>Verified</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* ===== MENU — ACCOUNT ===== */}
+          <Text style={styles.sectionTitle}>ACCOUNT</Text>
+          <View style={styles.menuGroup}>
+            {accountMenu.map((m, i) => (
+              <React.Fragment key={i}>
+                <TouchableOpacity 
+        style={styles.menuItem}
+        onPress={() => {
+          if (m.route) {
+            navigation.navigate(m.route);
+          } else {
+            handleMenuPress(m);
+          }
+        }} 
+        activeOpacity={0.7}
+      >
+        <View style={[styles.menuIcon, { backgroundColor: `${m.color}22` }]}>
+          <Ionicons name={m.icon as any} size={18} color={m.color} />
+        </View>
+        <Text style={styles.menuLabel}>{m.label}</Text>
+        <Ionicons name="chevron-forward" size={18} color="#3A3860" />
+      </TouchableOpacity>
+                {i < accountMenu.length - 1 && <View style={styles.menuDivider} />}
+              </React.Fragment>
+            ))}
+          </View>
+
+          {/* ===== MENU — SUPPORT ===== */}
+          <Text style={styles.sectionTitle}>SUPPORT</Text>
+          <View style={styles.menuGroup}>
+            {supportMenu.map((m, i) => (
+              <React.Fragment key={i}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuPress(m)} activeOpacity={0.7}>
+                  <View style={[styles.menuIcon, { backgroundColor: `${m.color}22` }]}>
+                    <Ionicons name={m.icon as any} size={18} color={m.color} />
+                  </View>
+                  <Text style={styles.menuLabel}>{m.label}</Text>
+                  <Ionicons name="chevron-forward" size={18} color="#3A3860" />
+                </TouchableOpacity>
+                {i < supportMenu.length - 1 && <View style={styles.menuDivider} />}
+              </React.Fragment>
+            ))}
+          </View>
+
+          {/* ===== ORIGINAL BOTTOM ELEMENTS (UNTOUCHED) ===== */}
+          <View style={styles.privacyRow}>
+            <Ionicons name="lock-closed" size={14} color="#4DFFB8" />
+            <Text style={styles.privacyText}>End-to-end encrypted • Face ID active</Text>
+          </View>
+
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={18} color="#FF6B6B" />
+            <Text style={styles.logoutText}>Log Out</Text>
+          </TouchableOpacity>
+
+          <View style={[styles.footerContainer, { marginBottom: 150 }]}>
+            <Text style={styles.footerText}>PingUp v2.4.0 • Made with </Text>
+            <HeartIcon />
+            <Text style={styles.footerText}> by Satyam</Text>
+          </View>
+
+        </Animated.View>
       </ScrollView>
 
-      {/* ✨ EDIT PROFILE MODAL */}
+                  {/* ===== EDIT PROFILE MODAL (Center Card) ===== */}
       <Modal
         visible={editModalVisible}
         transparent={true}
         animationType="fade"
+        onRequestClose={() => setEditModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Profile Name</Text>
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setEditModalVisible(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalContent} 
+            activeOpacity={1}
+            onPress={() => {}}
+          >
+            <View style={styles.modalHeaderRow}>
+              <View style={styles.modalIconBig}>
+                <Ionicons name="create-outline" size={22} color="#4DACFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>Edit Profile</Text>
+                <Text style={styles.modalSub}>Update your display name</Text>
+              </View>
+            </View>
             
+            <Text style={styles.modalInputLabel}>USERNAME</Text>
             <TextInput
               style={styles.modalInput}
               value={newUsername}
@@ -272,20 +339,29 @@ export default function ProfileScreen() {
             />
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditModalVisible(false)}>
+              <TouchableOpacity 
+                style={styles.cancelBtn} 
+                onPress={() => setEditModalVisible(false)}
+                activeOpacity={0.85}
+              >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateProfile} disabled={updating}>
+              <TouchableOpacity 
+                style={styles.saveBtn} 
+                onPress={handleUpdateProfile} 
+                disabled={updating}
+                activeOpacity={0.85}
+              >
                 {updating ? (
                   <ActivityIndicator color="#12102A" size="small" />
                 ) : (
-                  <Text style={styles.saveBtnText}>Save</Text>
+                  <Text style={styles.saveBtnText}>Save Changes</Text>
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
     </SafeAreaView>
@@ -295,32 +371,153 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#12102A' },
   scrollContent: { paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 40 : 20 },
-  title: { fontSize: 26, fontWeight: 'bold', color: '#fff', marginBottom: 20 },
-  profileCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 20, padding: 16, marginBottom: 14, gap: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  profileAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#4DACFF', justifyContent: 'center', alignItems: 'center', position: 'relative' },
-  profileInitial: { color: '#12102A', fontSize: 22, fontWeight: '800' },
-  onlineDot: { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#4DFFB8', borderWidth: 2, borderColor: '#12102A' },
-  profileName: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 3 },
-  profileHandle: { color: '#A0A0C0', fontSize: 12 },
-  proChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFB800', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  proText: { color: '#12102A', fontSize: 11, fontWeight: '800' },
-  statRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, gap: 8 },
-  statBox: { flex: 1, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  statNum: { color: '#4DACFF', fontSize: 20, fontWeight: '800', marginBottom: 2 },
-  statLbl: { color: '#A0A0C0', fontSize: 11, fontWeight: '600' },
-  storageCard: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 18, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  cardTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  percent: { color: '#4DACFF', fontSize: 12, fontWeight: '700' },
-  bar: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden', marginBottom: 12 },
-  barFill: { height: '100%', backgroundColor: '#4DACFF', borderRadius: 4 },
-  legendRow: { flexDirection: 'row', gap: 16 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 6, height: 6, borderRadius: 3 },
-  legendText: { color: '#A0A0C0', fontSize: 10, fontWeight: '600' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, marginBottom: 8, gap: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  menuIcon: { width: 34, height: 34, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  menuLabel: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '600' },
+
+  // ===== HEADER =====
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 22,
+  },
+  title: { fontSize: 26, fontWeight: 'bold', color: '#fff', letterSpacing: 0.3 },
+  subtitle: { fontSize: 12.5, color: '#6B6B8A', marginTop: 3, fontWeight: '500' },
+  headerIconBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(77,172,255,0.1)',
+    borderWidth: 1, borderColor: 'rgba(77,172,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+
+  // ===== HERO CARD =====
+  heroCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 28,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: -80, right: -80,
+    width: 200, height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(77,172,255,0.1)',
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  avatarGlowRing: {
+    position: 'absolute',
+    top: -8, left: -8, right: -8, bottom: -8,
+    borderRadius: 44,
+    backgroundColor: 'rgba(77,172,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(77,172,255,0.2)',
+  },
+  profileAvatar: { 
+    width: 72, height: 72, borderRadius: 36, 
+    justifyContent: 'center', alignItems: 'center', 
+    position: 'relative',
+    borderWidth: 3,
+    borderColor: '#12102A',
+  },
+  profileInitial: { color: '#FFF', fontSize: 28, fontWeight: '800' },
+  onlineDot: { 
+    position: 'absolute', 
+    bottom: 2, right: 2, 
+    width: 18, height: 18, borderRadius: 9, 
+    backgroundColor: '#4DFFB8', 
+    borderWidth: 3, 
+    borderColor: '#12102A' 
+  },
+  proChip: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4, 
+    backgroundColor: '#FFB800', 
+    paddingHorizontal: 10, 
+    paddingVertical: 4, 
+    borderRadius: 12,
+    position: 'absolute',
+    top: 16, right: 16,
+  },
+  proText: { color: '#12102A', fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+  profileName: { color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 4, textAlign: 'center' },
+  profileHandle: { color: '#A0A0C0', fontSize: 12.5, fontWeight: '500', textAlign: 'center' },
+  
+  // ===== VERIFIED BADGE =====
+  verifiedContainer: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#4DFFB8',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: '#4DFFB8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  verifiedText: {
+    color: '#12102A',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  // ===== SECTION TITLE =====
+  sectionTitle: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#6B6B8A',
+    letterSpacing: 1.3,
+    marginBottom: 12,
+    marginLeft: 4,
+  },
+
+  // ===== MENU GROUP =====
+  menuGroup: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    overflow: 'hidden',
+  },
+  menuItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: 16, 
+    paddingHorizontal: 16,
+    gap: 14, 
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    marginLeft: 60,
+    marginRight: 16,
+  },
+  menuIcon: { 
+    width: 36, height: 36, borderRadius: 12, 
+    justifyContent: 'center', alignItems: 'center' 
+  },
+  menuLabel: { flex: 1, color: '#fff', fontSize: 14.5, fontWeight: '600' },
+
+  // ===== ORIGINAL UNTOUCHED STYLES BELOW =====
   privacyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginVertical: 16 },
   privacyText: { color: '#6B6B8A', fontSize: 11, fontWeight: '600' },
   logoutBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,107,107,0.1)', borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(255,107,107,0.25)' },
@@ -328,14 +525,79 @@ const styles = StyleSheet.create({
   footerContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 30, gap: 4 },
   footerText: { color: '#3A3860', fontSize: 12, fontWeight: '700' },
 
-  // ✨ MODAL CSS
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { width: '100%', backgroundColor: '#1A183A', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  modalTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
-  modalInput: { backgroundColor: 'rgba(255,255,255,0.05)', color: '#FFF', borderRadius: 12, paddingHorizontal: 15, paddingVertical: 12, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
-  cancelBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)' },
-  cancelBtnText: { color: '#A0A0C0', fontWeight: 'bold' },
-  saveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10, backgroundColor: '#4DACFF', minWidth: 80, alignItems: 'center' },
-  saveBtnText: { color: '#12102A', fontWeight: 'bold' }
+  // ===== MODAL (BOTTOM SHEET) =====
+    // ===== MODAL (Center Card Style) =====
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.75)', 
+    justifyContent: 'center', // <-- Ye center me layega
+    paddingHorizontal: 20,
+  },
+  modalContent: { 
+    width: '100%', 
+    backgroundColor: '#1A183A', 
+    borderRadius: 24, // <-- Charo taraf se border radius
+    padding: 24,
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+    marginBottom: 100,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  modalIconBig: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: 'rgba(77,172,255,0.15)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  modalTitle: { color: '#FFF', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
+  modalSub: { color: '#6B6B8A', fontSize: 11.5, marginTop: 2, fontWeight: '500' },
+  modalInputLabel: {
+    color: '#6B6B8A', fontSize: 10.5, fontWeight: '800',
+    letterSpacing: 1.2, marginBottom: 8,
+  },
+  modalInput: { 
+    backgroundColor: 'rgba(255,255,255,0.05)', 
+    color: '#FFF', 
+    borderRadius: 14, 
+    paddingHorizontal: 15, 
+    paddingVertical: 14, 
+    fontSize: 15, 
+    marginBottom: 20, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.1)',
+    fontWeight: '600',
+  },
+  modalButtons: { flexDirection: 'row', gap: 10 },
+  cancelBtn: { 
+    flex: 1,
+    paddingVertical: 15, 
+    borderRadius: 14, 
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  cancelBtnText: { color: '#A0A0C0', fontWeight: '700', fontSize: 14 },
+  saveBtn: { 
+    flex: 1,
+    paddingVertical: 15, 
+    borderRadius: 14, 
+    backgroundColor: '#4DACFF', 
+    alignItems: 'center',
+    shadowColor: '#4DACFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  saveBtnText: { color: '#12102A', fontWeight: '800', fontSize: 14 },
 });

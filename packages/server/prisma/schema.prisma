@@ -32,6 +32,7 @@ model User {
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
   stories          Story[]   
+  storyViews       StoryView[] @relation("ViewerRelation")
   
   // 📞 NAYA: Call History Relations
   callsMade        CallHistory[] @relation("Caller")
@@ -48,6 +49,11 @@ model Message {
   mediaType  String?  // ✨ NAYA: 'image' ya 'video'
   status     String   @default("sent")
   createdAt  DateTime @default(now())
+
+  isDeleted  Boolean  @default(false)
+
+  deletedBySender   Boolean  @default(false) 
+  deletedByReceiver Boolean  @default(false)
   
   senderId   Int
   sender     User     @relation("SentMessages", fields: [senderId], references: [id])
@@ -56,15 +62,33 @@ model Message {
   receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
 }
 
-// NAYA MODEL: Stories ke liye
+// ✨ NAYA: Text Story Model
 model Story {
-  id        Int      @id @default(autoincrement())
-  mediaUrl  String   // Photo ya video ka link
-  expiresAt DateTime // 24 ghante baad delete hone ka time
-  createdAt DateTime @default(now())
+  id              Int         @id @default(autoincrement())
+  userId          Int
+  content         String      // Story ka text
+  backgroundColor String      // Background color (e.g., "#FF5733")
+  fontFamily      String?
+  createdAt       DateTime    @default(now())
+  expiresAt       DateTime    // Exact 24 ghante baad ka time
   
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  views           StoryView[] // Kis kisne dekha aur like kiya
+}
+
+// ✨ NAYA: Story View & Like Tracking Model
+model StoryView {
+  id        Int      @id @default(autoincrement())
+  storyId   Int
+  viewerId  Int
+  isLiked   Boolean  @default(false) // Like kiya ya nahi
+  viewedAt  DateTime @default(now())
+
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewer    User     @relation("ViewerRelation", fields: [viewerId], references: [id], onDelete: Cascade)
+
+  // Ek user ek story ko ek hi baar view record karega
+  @@unique([storyId, viewerId]) 
 }
 
 // 📞 NAYA MODEL: Call History ke liye
@@ -80,4 +104,8 @@ model CallHistory {
   
   receiverId Int
   receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
+
+  deletedByCaller   Boolean @default(false)
+  deletedByReceiver Boolean @default(false)
+  
 }

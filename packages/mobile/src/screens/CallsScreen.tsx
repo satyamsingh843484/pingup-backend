@@ -1,27 +1,73 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator 
+  View, Text, Modal, StyleSheet, Animated, ScrollView, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator 
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { getAvatarColor } from '../utils/avatarUtils';
+
+// ✨ NAYA LOGIC: Premium iOS jaisa bounciness wala Bottom Sheet
+const PremiumBottomSheet = ({ visible, onClose, children }: any) => {
+  const translateY = useRef(new Animated.Value(500)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const [renderModal, setRenderModal] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setRenderModal(true);
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.spring(translateY, { toValue: 0, tension: 70, friction: 11, useNativeDriver: true })
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 500, duration: 220, useNativeDriver: true })
+      ]).start(() => setRenderModal(false));
+    }
+  }, [visible]);
+
+  if (!renderModal) return null;
+
+  return (
+    <Modal transparent={true} visible={renderModal} animationType="none" onRequestClose={onClose}>
+      <Animated.View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', opacity, position: 'absolute', width: '100%', height: '100%' }} />
+      <TouchableOpacity style={{ flex: 1, justifyContent: 'flex-end' }} activeOpacity={1} onPress={onClose}>
+        <Animated.View style={{ transform: [{ translateY }], width: '100%' }}>
+          <TouchableOpacity activeOpacity={1}> 
+            {children}
+          </TouchableOpacity>
+        </Animated.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
 
 export default function CallsScreen() {
   const [calls, setCalls] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'missed'>('all');
+  const [myUserId, setMyUserId] = useState<number | null>(null); 
   
-  // Navigation hook add kiya gaya
+  // ✨ NAYA STATE: Selection Mode states
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedCalls, setSelectedCalls] = useState<number[]>([]);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+
   const navigation = useNavigation<any>();
 
-  useEffect(() => {
-    fetchCalls();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchCalls();
+      cancelSelection();
+    }, [])
+  );
 
   const fetchCalls = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      if (!token) return;
+      if (!token) return; 
 
       const response = await fetch('http://10.190.47.168:3000/api/calls/history', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -30,11 +76,68 @@ export default function CallsScreen() {
       
       if (json.success) {
         setCalls(json.calls);
+        setMyUserId(json.myUserId); 
       }
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✨ NAYA LOGIC: Selection aur Delete ke premium functions
+  const handleLongPress = (callId: number) => {
+    setIsSelectionMode(true);
+    setSelectedCalls([callId]);
+  };
+
+  const toggleSelectCall = (callId: number) => {
+    setSelectedCalls(prev => 
+      prev.includes(callId) ? prev.filter(id => id !== callId) : [...prev, callId]
+    );
+  };
+
+  const cancelSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedCalls([]);
+  };
+
+  const filteredCalls = calls.filter(call => {
+    const isMeReceiver = Number(call.receiverId) === Number(myUserId);
+    const isMeCaller = Number(call.callerId) === Number(myUserId);
+
+    if (filter === 'missed') {
+      return isMeReceiver && !isMeCaller && (call.status === 'missed' || call.status === 'declined');
+    }
+    return true; 
+  });
+
+  const handleSelectAll = () => {
+    if (selectedCalls.length === filteredCalls.length) {
+      setSelectedCalls([]);
+    } else {
+      setSelectedCalls(filteredCalls.map(c => c.id));
+    }
+  };
+
+  // ✨ UPDATE: Pehle modal band hoga, fir delete hoga
+  const confirmDelete = async () => {
+    setDeleteModalVisible(false);
+    if (selectedCalls.length === 0) return;
+    
+    const callsToDelete = selectedCalls;
+    cancelSelection();
+    setCalls(prev => prev.filter(call => !callsToDelete.includes(call.id)));
+
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch('http://10.190.47.168:3000/api/calls/delete-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ callIds: callsToDelete })
+      });
+    } catch (error) {
+      console.error("Delete failed:", error);
     }
   };
 
@@ -46,19 +149,11 @@ export default function CallsScreen() {
     );
   }
 
-  // Dummy calls agar database khali hai (UI test karne ke liye)
-  const displayCalls = calls.length > 0 ? calls : [
-    { id: 1, type: 'video', status: 'missed', createdAt: new Date().toISOString(), caller: { username: 'Sneha' } },
-    { id: 2, type: 'audio', status: 'completed', createdAt: new Date(Date.now() - 3600000).toISOString(), caller: { username: 'Aman' } },
-    { id: 3, type: 'video', status: 'declined', createdAt: new Date(Date.now() - 86400000).toISOString(), caller: { username: 'Rahul_Dev' } },
-  ];
-
-  // Ye function call lagane par CallScreen open karega
-  const handleCallPress = (call: any) => {
+  const handleCallPress = (targetId: number, targetName: string, type: string) => {
     navigation.navigate('CallScreen', {
-      receiverId: call.callerId || 2, // Backend ID
-      receiverName: call.caller?.username || 'Unknown',
-      type: call.type,
+      receiverId: targetId,
+      receiverName: targetName,
+      type: type,
       isIncoming: false
     });
   };
@@ -66,26 +161,61 @@ export default function CallsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Calls</Text>
-        <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="call-outline" size={20} color="#FFF" />
-          <View style={styles.badge} />
-        </TouchableOpacity>
-      </View>
+      {/* ✨ FIX: Dynamic Header (Normal vs Selection Mode with Trash Icon) */}
+      {isSelectionMode ? (
+        <View style={[styles.header, { backgroundColor: '#1A183A', paddingBottom: 15 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={cancelSelection} style={{ marginRight: 15 }}>
+              <Ionicons name="close" size={26} color="#FFF" />
+            </TouchableOpacity>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#FFF' }}>
+              {selectedCalls.length} Selected
+            </Text>
+          </View>
+          
+          {/* NAYA UPDATE YAHAN HAI: Select All aur Trash icon ek sath */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={handleSelectAll} style={{ marginRight: selectedCalls.length > 0 ? 15 : 0 }}>
+              <Text style={{ color: '#4DACFF', fontSize: 16, fontWeight: '600' }}>
+                {selectedCalls.length === filteredCalls.length ? 'Deselect' : 'Select All'}
+              </Text>
+            </TouchableOpacity>
+            
+            {selectedCalls.length > 0 && (
+              <TouchableOpacity onPress={() => setDeleteModalVisible(true)}>
+                <Ionicons name="trash" size={22} color="#FF6B6B" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Calls</Text>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="call-outline" size={20} color="#FFF" />
+            <View style={styles.badge} />
+          </TouchableOpacity>
+        </View>
+      )}
 
-      {/* Tabs (All / Missed) */}
+      {/* Tabs */}
       <View style={styles.tabContainer}>
         <TouchableOpacity 
           style={[styles.tabBtn, filter === 'all' && styles.tabBtnActive]} 
-          onPress={() => setFilter('all')}
+          onPress={() => {
+            setFilter('all');
+            cancelSelection();
+          }}
         >
           <Text style={[styles.tabText, filter === 'all' && styles.tabTextActive]}>All</Text>
         </TouchableOpacity>
+        
         <TouchableOpacity 
           style={[styles.tabBtn, filter === 'missed' && styles.tabBtnActive]} 
-          onPress={() => setFilter('missed')}
+          onPress={() => {
+            setFilter('missed');
+            cancelSelection();
+          }}
         >
           <Text style={[styles.tabText, filter === 'missed' && styles.tabTextActive]}>Missed</Text>
         </TouchableOpacity>
@@ -93,7 +223,6 @@ export default function CallsScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Create Call Link Card */}
         <TouchableOpacity style={styles.createLinkCard}>
           <View style={styles.linkIconBox}>
             <Ionicons name="link" size={24} color="#4DACFF" />
@@ -106,49 +235,135 @@ export default function CallsScreen() {
 
         <Text style={styles.sectionTitle}>Recent</Text>
 
-        {/* Calls List */}
-        <View style={styles.callsList}>
-          {displayCalls.map((call, index) => {
-            const isMissed = call.status === 'missed';
-            return (
-              <TouchableOpacity key={index} style={styles.callItem} onPress={() => handleCallPress(call)}>
-                <View style={[styles.avatar, { backgroundColor: isMissed ? '#FF6B6B' : '#4DACFF' }]}>
-                  <Text style={styles.avatarText}>{call.caller?.username?.[0]?.toUpperCase() || 'U'}</Text>
-                </View>
-                
-                <View style={styles.callContent}>
-                  <Text style={[styles.callerName, isMissed && { color: '#FF6B6B' }]}>
-                    {call.caller?.username || 'Unknown User'}
-                  </Text>
+        {filteredCalls.length === 0 ? (
+          <View style={{ alignItems: 'center', marginTop: 40 }}>
+            <Ionicons name="call-outline" size={40} color="rgba(255,255,255,0.2)" />
+            <Text style={{ color: '#A0A0C0', marginTop: 10 }}>No recent calls found.</Text>
+          </View>
+        ) : (
+          <View style={styles.callsList}>
+            {filteredCalls.map((call, index) => {
+              const isMissed = call.status === 'missed';
+              const isOutgoing = Number(call.callerId) === Number(myUserId); 
+              const otherUser = isOutgoing ? call.receiver : call.caller;
+              const targetId = isOutgoing ? call.receiverId : call.callerId;
+              const targetName = otherUser?.username || 'Unknown User';
+              
+              // ✨ NAYA LOGIC: Checkbox state check
+              const isSelected = selectedCalls.includes(call.id);
+
+              return (
+                <TouchableOpacity 
+                  key={index} 
+                  style={[
+                    styles.callItem,
+                    isSelected && { backgroundColor: 'rgba(77, 172, 255, 0.15)', borderColor: '#4DACFF' }
+                  ]}
+                  onLongPress={() => handleLongPress(call.id)}
+                  onPress={() => isSelectionMode ? toggleSelectCall(call.id) : handleCallPress(targetId, targetName, call.type)}
+                  activeOpacity={0.7}
+                >
                   
-                  <View style={styles.callDetails}>
-                    <Ionicons 
-                      name={isMissed ? "arrow-down-outline" : "arrow-up-outline"} 
-                      size={14} 
-                      color={isMissed ? "#FF6B6B" : "#4DFFB8"} 
-                      style={{ marginRight: 4 }}
-                    />
-                    <Text style={styles.callTime}>
-                      {new Date(call.createdAt).toLocaleDateString()} • {call.type === 'video' ? 'Video' : 'Audio'}
-                    </Text>
+                  {/* ✨ FIX: Custom Premium Checkbox */}
+                  {isSelectionMode && (
+                    <View style={{ marginRight: 15, justifyContent: 'center' }}>
+                      <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: isSelected ? '#4DACFF' : '#6B6B8A', backgroundColor: isSelected ? '#4DACFF' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                        {isSelected && <Ionicons name="checkmark" size={14} color="#FFF" />}
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={[styles.avatar, { backgroundColor: getAvatarColor(targetName), marginRight: !isSelectionMode ? 15 : 10 }]}>
+                    <Text style={styles.avatarText}>{targetName[0]?.toUpperCase()}</Text>
                   </View>
-                </View>
+                  
+                  <View style={styles.callContent}>
+                    <Text style={[styles.callerName, isMissed && !isOutgoing && { color: '#FF6B6B' }]}>
+                      {targetName}
+                    </Text>
+                    
+                    <View style={styles.callDetails}>
+                      <Feather 
+                        name={isOutgoing ? 'arrow-up-right' : 'arrow-down-left'} 
+                        size={14} 
+                        color={isMissed ? '#FF6B6B' : (isOutgoing ? '#4DFFB8' : '#4DACFF')} 
+                        style={{ marginRight: 6 }}
+                      />
+                      <Ionicons 
+                        name={call.type === 'video' ? 'videocam' : 'call'} 
+                        size={12} 
+                        color="#A0A0C0" 
+                        style={{ marginRight: 4 }}
+                      />
+                      <Text style={styles.callTime}>
+                        {isOutgoing ? 'Outgoing' : 'Incoming'}
+                      </Text>
+                    </View>
+                  </View>
 
-                {/* Right side icon button - Ab ispe bhi UI khulega */}
-                <TouchableOpacity style={styles.actionBtn} onPress={() => handleCallPress(call)}>
-                  <Ionicons name={call.type === 'video' ? 'videocam' : 'call'} size={22} color="#4DACFF" />
+                  {!isSelectionMode && (
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleCallPress(targetId, targetName, call.type)}>
+                      <Ionicons name={call.type === 'video' ? 'videocam' : 'call'} size={22} color="#4DACFF" />
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
 
-      {/* Floating Action Button (New Call) - Test call dialer */}
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('CallScreen', { receiverId: 2, receiverName: 'Sneha', type: 'audio', isIncoming: false })}>
-        <Ionicons name="call" size={24} color="#12102A" />
-      </TouchableOpacity>
+      {/* ✨ FIX: Niche overlap wala bar hata diya. Ab normal FAB hi rahega */}
+      {!isSelectionMode && (
+        <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('ContactsScreen')}>
+          <Ionicons name="call" size={24} color="#12102A" />
+        </TouchableOpacity>
+      )}
+      {/* 🗑️ PREMIUM DELETE CALLS MODAL (HomeScreen Match) */}
+      <PremiumBottomSheet visible={deleteModalVisible} onClose={() => setDeleteModalVisible(false)}>
+        <View style={[styles.modalContainer, { minHeight: 0, justifyContent: 'flex-start', paddingBottom: 20 }]}>
+          
+          <View>
+            {/* Patla sa line (Drag Handle) */}
+            <View style={{ width: 40, height: 4, backgroundColor: '#4A4A6A', borderRadius: 2, alignSelf: 'center', marginBottom: 15 }} />
+            
+            <Text style={styles.modalTitle}>Delete Calls?</Text>
+            
+            <Text style={{ color: '#A0A0C0', textAlign: 'center', lineHeight: 21, marginBottom: 18, paddingHorizontal: 20, fontSize: 14 }}>
+              This will permanently delete{' '}
+              <Text style={{ fontWeight: '700', color: '#4DACFF' }}>{selectedCalls.length} selected call(s)</Text>.
+              {'\n'}
+              <Text style={{ fontSize: 12, color: '#6B6B8A', fontStyle: 'italic' }}>
+                This action cannot be undone.
+              </Text>
+            </Text>
+
+            {/* Exact HomeScreen jaisa Delete Button */}
+            <TouchableOpacity style={styles.modalOption} onPress={confirmDelete}>
+              <Ionicons name="trash-outline" size={22} color="#FF6B6B" />
+              <Text style={styles.modalOptionText}>Delete Calls</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Premium Cancel Button */}
+          <TouchableOpacity
+  style={{
+    backgroundColor: '#2A2A40',
+    borderRadius: 15,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 20,
+  }}
+  onPress={() => setDeleteModalVisible(false)}
+>
+  <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '600' }}>
+    Cancel
+  </Text>
+</TouchableOpacity>
+          
+        </View>
+      </PremiumBottomSheet>
 
     </SafeAreaView>
   );
@@ -189,5 +404,33 @@ const styles = StyleSheet.create({
 
   actionBtn: { padding: 10 },
 
-  fab: { position: 'absolute', right: 20, bottom: 110, width: 56, height: 56, borderRadius: 28, backgroundColor: '#4DACFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#4DACFF', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, shadowRadius: 10 }
+  fab: { position: 'absolute', right: 20, bottom: 110, width: 56, height: 56, borderRadius: 28, backgroundColor: '#4DACFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#4DACFF', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, shadowRadius: 10 },
+  // Modal Styles (Exact Match with HomeScreen)
+  modalContainer: { 
+    backgroundColor: '#1A183A', 
+    borderTopLeftRadius: 24, 
+    borderTopRightRadius: 24, 
+    padding: 20, 
+    paddingBottom: 20 
+  },
+  modalTitle: { 
+    color: '#FFF', 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    marginBottom: 15, 
+    textAlign: 'center' 
+  },
+  modalOption: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: 16, 
+    borderBottomWidth: 1, 
+    borderBottomColor: 'rgba(255,255,255,0.05)' 
+  },
+  modalOptionText: { 
+    fontSize: 16, 
+    marginLeft: 15, 
+    fontWeight: '500', 
+    color: '#FF6B6B' 
+  }
 });

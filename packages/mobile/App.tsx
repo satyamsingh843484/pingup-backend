@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { BlurView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthContext } from './src/context/AuthContext';
 
 import AuthScreen from './src/screens/AuthScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -18,6 +20,9 @@ import CallScreen from './src/screens/CallScreen';
 import ContactsScreen from './src/screens/ContactsScreen';
 import HelpSupportScreen from './src/screens/HelpSupportScreen';
 import AboutScreen from './src/screens/AboutScreen';
+import PrivacySecurityScreen from './src/screens/PrivacySecurityScreen';
+import CreateStoryScreen from './src/screens/CreateStoryScreen';
+import StoryViewerScreen from './src/screens/StoryViewerScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -79,87 +84,77 @@ function MainTabNavigator() {
 }
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [userToken, setUserToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken'); 
+        if (token) setUserToken(token);
+      } catch (error) {
+        console.error("Token fetch error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    checkLoginStatus();
+  }, []);
+
+  const authContext = React.useMemo(() => ({
+    signIn: async (token: string) => {
+      await AsyncStorage.setItem('userToken', token);
+      setUserToken(token); 
+    },
+    signOut: async () => {
+      await AsyncStorage.removeItem('userToken');
+      setUserToken(null); 
+    }
+  }), []);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#12102A' }}>
+        <ActivityIndicator size="large" color="#4DACFF" />
+      </View>
+    );
+  }
+
   return (
+    <AuthContext.Provider value={authContext}>
     <NavigationContainer>
       <Stack.Navigator 
-      initialRouteName="Auth" 
-      screenOptions={{ 
-        headerShown: false,
-        // Default animation sabke liye WhatsApp jaisi side-slide rakhte hain
-        animation: 'slide_from_right' 
-      }}
-    >
-      <Stack.Screen 
-        name="Auth" 
-        component={AuthScreen} 
-        options={{ animation: 'fade' }} 
-      />
-      
-      <Stack.Screen 
-        name="Home" 
-        component={MainTabNavigator} 
-        options={{ animation: 'fade' }} 
-      />
-      
-      {/* Chat screen hamesha right side se smooth slide hogi */}
-      <Stack.Screen 
-        name="ChatDetail" 
-        component={ChatDetailScreen} 
-        options={{ animation: 'slide_from_right' }} 
-      />
-      
-      {/* Notifications neeche se upar aayega ek sheet ki tarah */}
-      <Stack.Screen 
-        name="NotificationsScreen" // ✨ Route name fix kar diya
-        component={NotificationsScreen} 
-        options={{ 
-          animation: 'slide_from_bottom',
-          presentation: 'modal' // iOS/Android dono me asli popup modal jaisa feel dega
-        }} 
-      />
-      
-      <Stack.Screen 
-        name="AIAssistant" 
-        component={AIAssistantScreen} 
-        options={{ 
-          animation: 'slide_from_bottom',
-          presentation: 'modal'
-        }} 
-      />
-      
-      {/* Call Screen fade hoke aayegi, aur koi isko back-swipe karke hata nahi payega */}
-      <Stack.Screen
-        name="CallScreen"
-        component={CallScreen}
-        options={{
+        screenOptions={{ 
           headerShown: false,
-          animation: 'fade',
-          gestureEnabled: false, // Call screen par swipe-to-back disabled hona chahiye
+          animation: 'slide_from_right' 
         }}
-      />
-      
-      {/* New Chat (+) dabane par list neeche se upar pop hogi */}
-      <Stack.Screen 
-        name="ContactsScreen" 
-        component={ContactsScreen} 
-        options={{ 
-          animation: 'slide_from_bottom',
-          presentation: 'modal' 
-        }} 
-      />
-      <Stack.Screen 
-  name="HelpSupportScreen" 
-  component={HelpSupportScreen} 
-  options={{ animation: 'slide_from_right' }} 
-/>
-<Stack.Screen 
-  name="AboutScreen" 
-  component={AboutScreen} 
-  options={{ animation: 'slide_from_right' }} 
-/>
-      
-    </Stack.Navigator>
+      >
+        {userToken === null ? (
+          /* ✨ AGAR TOKEN NAHI HAI TOH SIRF AUTH SCREEN */
+          <Stack.Screen 
+            name="Auth" 
+            component={AuthScreen} 
+            options={{ animation: 'fade' }} 
+          />
+        ) : (
+          /* ✨ AGAR TOKEN HAI TOH DIRECT MAIN APP */
+          <Stack.Group>
+            <Stack.Screen name="Home" component={MainTabNavigator} options={{ animation: 'fade' }} />
+            <Stack.Screen name="ChatDetail" component={ChatDetailScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} options={{ animation: 'slide_from_right', presentation: 'modal' }} />
+            <Stack.Screen name="AIAssistant" component={AIAssistantScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="CallScreen" component={CallScreen} options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
+            <Stack.Screen name="ContactsScreen" component={ContactsScreen} options={{ animation: 'slide_from_right', presentation: 'modal' }} />
+            <Stack.Screen name="HelpSupportScreen" component={HelpSupportScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="AboutScreen" component={AboutScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="PrivacySecurityScreen" component={PrivacySecurityScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
+            <Stack.Screen name="CreateStory" component={CreateStoryScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="StoryViewer" component={StoryViewerScreen} options={{ headerShown: false, presentation: 'modal' }} />
+          </Stack.Group>
+        )}
+      </Stack.Navigator>
     </NavigationContainer>
+    </AuthContext.Provider>
   );
 }
 

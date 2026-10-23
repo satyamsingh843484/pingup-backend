@@ -1,41 +1,10 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+// packages/mobile/src/utils/avatarUtils.ts
 
-# dependencies
-node_modules/
+import { getAvatarColor } from '../utils/avatarUtils';
+export const AVATAR_COLORS = ['#4DACFF', '#9B59B6', '#FF6B6B', '#4DFFB8', '#FFB800', '#FF9F43'];
 
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-# generated native folders
-/ios
-/android
+export const getAvatarColor = (name: string) => {
+  if (!name) return AVATAR_COLORS[0];
+  const idx = name.charCodeAt(0) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+};

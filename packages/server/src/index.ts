@@ -11,6 +11,7 @@ import messagesRouter from './routes/messages';
 import chatsRouter from './routes/chats';
 import profileRouter from './routes/profile';
 import callsRouter from './routes/calls';
+import storyRoutes from './routes/stories';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -25,6 +26,7 @@ const io = new Server(server, {
     methods: ['GET', 'POST']
   }
 });
+app.set('io', io);
 
 // Middlewares
 app.use(cors());
@@ -43,10 +45,12 @@ app.use('/api/messages', messagesRouter);
 app.use('/api/chats', chatsRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/calls', callsRouter);
+app.use('/api/stories', storyRoutes);
 
 // ✨ FIX: Map me ab safely String keys use hongi
 const onlineUsers = new Map();
 
+app.locals.onlineUsers = onlineUsers;
 // 📞 Real-Time Socket.IO Logic
 io.on('connection', (socket) => {
   console.log('✅ A user connected:', socket.id);
@@ -167,6 +171,14 @@ io.on('connection', (socket) => {
     } catch (error) {
       console.error('Error updating read status:', error);
     }
+  });
+  socket.on('messagesRead', (data) => {
+    io.to(`user_${data.toUserId}`).emit('messagesReadLive');
+  });
+
+  // ✨ NAYA: Bulk Delete ka live event
+  socket.on('deleteMessagesBulk', ({ messageIds, receiverId }) => {
+    io.to(`user_${receiverId}`).emit('messagesDeletedBulk', { messageIds });
   });
 
   // 5. User app band kar de toh (UPDATED with DB Last Seen)

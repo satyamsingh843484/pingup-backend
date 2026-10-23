@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "693083297584",
+    "project_id": "pingup-a118e",
+    "storage_bucket": "pingup-a118e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:693083297584:android:1f6354277e99bd3e535af5",
+        "android_client_info": {
+          "package_name": "com.satyam.pingup"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "693083297584-3ashagaf1v9apcf60oto2v1o5gqkecgl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.satyam.pingup",
+            "certificate_hash": "1d8e654885716b54ea2d5692db48de1a98127121"
+          }
+        },
+        {
+          "client_id": "693083297584-96rv4qgm51dtakav07o9ntj4vhkvqtqf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFzr1EJ7s45aX3KtlojDhidFLM-e5ba2E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "693083297584-96rv4qgm51dtakav07o9ntj4vhkvqtqf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

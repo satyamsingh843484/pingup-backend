@@ -76,7 +76,7 @@ export default function HomeScreen() {
 
     try {
       const token = await AsyncStorage.getItem('userToken');
-      await fetch(`http://10.190.47.168:3000/api/messages/chat/${chatUserId}`, {
+      await fetch(`https://pingup-backend-v25a.onrender.com/api/messages/chat/${chatUserId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -102,7 +102,7 @@ export default function HomeScreen() {
       }
       token = (await Notifications.getExpoPushTokenAsync()).data;
       console.log("🔥 Mera Push Token:", token);
-      await fetch('http://10.190.47.168:3000/api/auth/save-push-token', {
+      await fetch('https://pingup-backend-v25a.onrender.com/api/auth/save-push-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: userId, pushToken: token }),
@@ -151,7 +151,7 @@ socket.on('userStatus', handleUserStatus);
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) return;
-      const response = await fetch('http://10.190.47.168:3000/api/stories', {
+      const response = await fetch('https://pingup-backend-v25a.onrender.com/api/stories', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await response.json();
@@ -170,7 +170,7 @@ socket.on('userStatus', handleUserStatus);
 
       if (!token) { navigation.replace('Auth'); return; }
       
-      const response = await fetch('http://10.190.47.168:3000/api/chats/recent', { // Apna sahi IP yahan check kar lena
+      const response = await fetch('https://pingup-backend-v25a.onrender.com/api/chats/recent', { // Apna sahi IP yahan check kar lena
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await response.json();

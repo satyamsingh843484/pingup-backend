@@ -6,7 +6,7 @@ import { getAvatarColor } from '../utils/avatarUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { io } from 'socket.io-client';
 
-const socket = io('http://10.190.47.168:3000');
+const socket = io('https://pingup-backend-v25a.onrender.com');
 
 export default function CallScreen() {
   const route = useRoute<any>();
@@ -94,7 +94,7 @@ export default function CallScreen() {
       
       const token = await AsyncStorage.getItem('userToken');
       
-      await fetch('http://10.190.47.168:3000/api/calls/log', {
+      await fetch('https://pingup-backend-v25a.onrender.com/api/calls/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ receiverId, type, status, duration: callDuration })
@@ -118,7 +118,7 @@ export default function CallScreen() {
         }
       }
 
-      await fetch('http://10.190.47.168:3000/api/messages/send', {
+      await fetch('https://pingup-backend-v25a.onrender.com/api/messages/send', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

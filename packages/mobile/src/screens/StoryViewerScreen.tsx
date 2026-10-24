@@ -56,7 +56,7 @@ export default function StoryViewerScreen() {
     setIsDeleting(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const res = await fetch(`http://10.190.47.168:3000/api/stories/delete/${currentStory.id}`, {
+      const res = await fetch(`https://pingup-backend-v25a.onrender.com/api/stories/delete/${currentStory.id}`, {
         method: 'DELETE',
         headers: { 
           'Authorization': `Bearer ${token}`,

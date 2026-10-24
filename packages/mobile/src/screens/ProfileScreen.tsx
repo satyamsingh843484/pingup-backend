@@ -52,7 +52,7 @@ export default function ProfileScreen() {
         navigation.replace('Auth');
         return;
       }
-      const response = await fetch('http://10.190.47.168:3000/api/profile/me', {
+      const response = await fetch('https://pingup-backend-v25a.onrender.com/api/profile/me', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await response.json();
@@ -77,7 +77,7 @@ export default function ProfileScreen() {
     setUpdating(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch('http://10.190.47.168:3000/api/profile/update', {
+      const response = await fetch('https://pingup-backend-v25a.onrender.com/api/profile/update', {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

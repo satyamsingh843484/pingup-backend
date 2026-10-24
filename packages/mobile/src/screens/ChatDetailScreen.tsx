@@ -227,7 +227,7 @@ connectAndSync();
       const token = await AsyncStorage.getItem('userToken');
       if (!token) return;
 
-      const response = await fetch(`http://10.190.47.168:3000/api/messages/chat/${userId}`, {
+      const response = await fetch(`https://pingup-backend-v25a.onrender.com/api/messages/chat/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await response.json();
@@ -238,7 +238,7 @@ connectAndSync();
 
         // ✨ NAYA LOGIC: Messages load hote hi unhe "read" mark kar do
         try {
-          await fetch(`http://10.190.47.168:3000/api/messages/mark-read`, {
+          await fetch(`https://pingup-backend-v25a.onrender.com/api/messages/mark-read`, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json', 
@@ -303,7 +303,7 @@ connectAndSync();
 
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch('http://10.190.47.168:3000/api/messages/send', {
+      const response = await fetch('https://pingup-backend-v25a.onrender.com/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ receiverId: userId, content: tempMessage.content })
@@ -360,7 +360,7 @@ connectAndSync();
       }
 
       const token = await AsyncStorage.getItem('userToken');
-      await fetch(`http://10.190.47.168:3000/api/messages/delete-bulk`, {
+      await fetch(`https://pingup-backend-v25a.onrender.com/api/messages/delete-bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ messageIds, type })
@@ -433,7 +433,7 @@ connectAndSync();
 
       // Node.js par URL send karo
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch('http://10.190.47.168:3000/api/messages/send', {
+      const response = await fetch('https://pingup-backend-v25a.onrender.com/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ 
@@ -610,7 +610,7 @@ connectAndSync();
       }
 
       const token = await AsyncStorage.getItem('userToken');
-      await fetch(`http://10.190.47.168:3000/api/messages/delete-bulk`, {
+      await fetch(`https://pingup-backend-v25a.onrender.com/api/messages/delete-bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ messageIds, type })

@@ -88,7 +88,7 @@ export default function AuthScreen() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  const API_BASE = 'http://10.190.47.168:3000/api/auth';
+  const API_BASE = 'https://pingup-backend-v25a.onrender.com/api/auth';
 
   const handleToggleMethod = (method) => {
     setAuthMethod(method);
@@ -152,7 +152,7 @@ export default function AuthScreen() {
       const userEmail = userCredential.user.email;
       const firebaseUid = userCredential.user.uid;
 
-      const BACKEND_URL = 'http://10.190.47.168:3000/api/auth/unified-login'; 
+      const BACKEND_URL = 'https://pingup-backend-v25a.onrender.com/api/auth/unified-login'; 
 
       const response = await fetch(BACKEND_URL, {
         method: 'POST',

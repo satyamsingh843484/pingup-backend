@@ -87,7 +87,7 @@ export default function CreateStoryScreen() {
 
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch('http://10.190.47.168:3000/api/stories/create', {
+      const response = await fetch('https://pingup-backend-v25a.onrender.com/api/stories/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

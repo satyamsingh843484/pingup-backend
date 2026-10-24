@@ -1,6 +1,5 @@
 import { io } from 'socket.io-client';
 
-// autoConnect: false hata diya, ab ye app khulte hi zinda ho jayega
-const socket = io('http://10.190.47.168:3000');
+const socket = io('https://pingup-backend-v25a.onrender.com');
 
 export default socket;

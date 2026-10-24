@@ -20,7 +20,7 @@ export default function NotificationsScreen() {
   const fetchNotifications = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch('http://10.190.47.168:3000/api/messages/unread', {
+      const response = await fetch('https://pingup-backend-v25a.onrender.com/api/messages/unread', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await response.json();

@@ -137,7 +137,7 @@ export default function ContactsScreen() {
   const fetchSuggestedUsers = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch('http://10.190.47.168:3000/api/chats/suggested', {
+      const response = await fetch('https://pingup-backend-v25a.onrender.com/api/chats/suggested', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await response.json();
@@ -151,7 +151,7 @@ export default function ContactsScreen() {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch(`http://10.190.47.168:3000/api/chats/search?query=${text}`, {
+      const response = await fetch(`https://pingup-backend-v25a.onrender.com/api/chats/search?query=${text}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await response.json();
